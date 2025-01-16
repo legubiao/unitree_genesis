@@ -20,5 +20,5 @@ DOF_NAMES = [
 ],
 INIT_HEIGHT = 0.5  # Initial height
 
-SIMULATE_DT = 0.005  # Need to be larger than the runtime of viewer.sync()
-VIEWER_DT = 0.02  # 50 fps for viewer
+SIMULATE_DT = 0.01  # Need to be larger than the runtime of viewer.sync()
+VIEWER_FPS = 100  # 30 fps for viewer

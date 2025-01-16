@@ -13,8 +13,11 @@ else:
 
 scene = gs.Scene(
     sim_options=gs.options.SimOptions(
-        dt=0.005,
+        dt=config.SIMULATE_DT,
         gravity=(0, 0, -9.81),
+    ),
+    viewer_options=gs.options.ViewerOptions(
+        max_FPS=config.VIEWER_FPS,
     ),
 )
 
