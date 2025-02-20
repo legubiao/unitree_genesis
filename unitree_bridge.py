@@ -12,6 +12,8 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import SportModeState_
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowState_ as LowState_default
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__SportModeState_
 
+from genesis.utils.geom import transform_by_quat, inv_quat
+
 TOPIC_LOWCMD = "rt/lowcmd"
 TOPIC_LOWSTATE = "rt/lowstate"
 TOPIC_HIGHSTATE = "rt/sportmodestate"
@@ -19,7 +21,7 @@ TOPIC_WIRELESS_CONTROLLER = "rt/wirelesscontroller"
 
 
 class UnitreeSdk2GenesisBridge:
-    def __init__(self, robot, scene):
+    def __init__(self, robot, scene, gs):
 
         ChannelFactoryInitialize(config.DOMAIN_ID, config.INTERFACE)
 
@@ -31,6 +33,7 @@ class UnitreeSdk2GenesisBridge:
         self.dof_pos = torch.zeros(self.num_motor)
         self.dof_vel = torch.zeros(self.num_motor)
         self.dof_torque = torch.zeros(self.num_motor)
+        self.global_gravity = torch.tensor(self.scene.gravity, dtype=gs.tc_float, device=gs.device)
 
         self.output_force = np.zeros(self.num_motor)
 
@@ -69,10 +72,20 @@ class UnitreeSdk2GenesisBridge:
             self.low_state.motor_state[i].tau_est = self.dof_torque[i]
 
         # IMU readings
-        self.low_state.imu_state.quaternion[:] = self.robot.get_quat()[:4]
+        base_quat = self.robot.get_quat()
+        self.low_state.imu_state.quaternion[:] = base_quat[:4]
         self.low_state.imu_state.gyroscope[:] = self.robot.get_ang()[:3]
-        self.low_state.imu_state.accelerometer[:] = [0, 0, -9.81]
-        # Todo: Waiting Genesis to add accelerometer readings
+
+        links_acc = self.robot.get_links_acc()
+        if len(links_acc) > 0:
+            inv_base_quat = inv_quat(base_quat)
+            projected_gravity = transform_by_quat(self.global_gravity, inv_base_quat)
+            projected_acc = transform_by_quat(links_acc[0], inv_base_quat)
+            self.low_state.imu_state.accelerometer[:] = projected_acc - projected_gravity
+
+        # inv_base_quat = inv_quat(base_quat)
+        # projected_gravity = transform_by_quat(self.global_gravity, inv_base_quat)
+        # self.low_state.imu_state.accelerometer[:] = projected_gravity
 
         self.low_state_puber.Write(self.low_state)
 
@@ -86,6 +99,7 @@ class UnitreeSdk2GenesisBridge:
         self.robot.control_dofs_force(self.output_force, self.motor_dofs)
 
     def publish_high_state(self):
+        inv_base_quat = inv_quat(self.robot.get_quat())
         self.high_state.position[:] = self.robot.get_pos()[:3]
-        self.high_state.velocity[:] = self.robot.get_vel()[:3]
+        self.high_state.velocity[:] = transform_by_quat(self.robot.get_vel(), inv_base_quat)
         self.high_state_puber.Write(self.high_state)

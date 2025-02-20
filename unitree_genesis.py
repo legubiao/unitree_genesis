@@ -33,7 +33,7 @@ robot = scene.add_entity(
 )
 
 scene.build()
-unitree = UnitreeSdk2GenesisBridge(robot, scene)
+unitree = UnitreeSdk2GenesisBridge(robot, scene, gs)
 
 while True:
     scene.step()
